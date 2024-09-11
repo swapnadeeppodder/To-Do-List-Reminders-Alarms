@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Todo List with Score and Alarm</title>
+<style>
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-image: url('background.jpeg'); /* Placeholder for background image */
+  background-size: cover;
+  background-position: center;
+  margin: 0;
+  padding: 0;
+  color: #fff;
+}
+
+.container {
+  max-width: 600px;
+  margin: 50px auto;
+  padding: 30px;
+  background: rgba(0, 0, 0, 0.7); /* Semi-transparent dark background */
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px); /* Frosted glass effect */
+  border: 2px solid #3498db; /* Blue border */
+  transition: all 0.3s ease;
+}
+
+.container:hover {
+  box-shadow: 0 15px 45px rgba(0, 0, 0, 0.7); /* Enhanced shadow on hover */
+  transform: translateY(-10px); /* Slight lift on hover */
+}
+
+h2 {
+  text-align: center;
+  color: #00d7ff;
+  font-size: 28px;
+  text-shadow: 0 0 10px #00d7ff, 0 0 20px #00d7ff;
+}
+
+input[type="text"],
+input[type="time"],
+.reminder-time-input {
+  width: calc(100% - 20px);
+  padding: 10px;
+  margin: 10px 0;
+  background: #222;
+  color: #fff;
+  border: 2px solid #3498db;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(52, 152, 219, 0.8); /* Blue light glow */
+  transition: all 0.3s ease;
+}
+
+input[type="text"]:focus,
+input[type="time"]:focus,
+.reminder-time-input:focus {
+  box-shadow: 0 0 15px rgba(52, 152, 219, 1); /* Stronger blue glow on focus */
+  border-color: #00d7ff;
+  outline: none;
+}
+
+button {
+  padding: 10px 20px;
+  margin: 10px 5px;
+  background: linear-gradient(45deg, #00d7ff, #3498db);
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  box-shadow: 0 5px 15px rgba(0, 215, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 16px;
+}
+
+button:hover {
+  background: linear-gradient(45deg, #3498db, #00d7ff);
+  box-shadow: 0 10px 25px rgba(0, 215, 255, 0.8);
+  transform: translateY(-5px); /* Button lift on hover */
+}
+
+button:active {
+  transform: translateY(2px); /* Button press effect */
+}
+
+label {
+  color: #00d7ff;
+  text-shadow: 0 0 5px #00d7ff, 0 0 10px #00d7ff;
+  font-size: 18px;
+}
+
+.completed {
+  text-decoration: line-through;
+  color: #bdc3c7;
+}
+
+#score {
+  font-weight: bold;
+  color: #00d7ff;
+  text-shadow: 0 0 10px #00d7ff;
+}
+
+.remove-task {
+  cursor: pointer;
+  font-size: 20px;
+  color: #e74c3c;
+  transition: color 0.3s ease;
+}
+
+.remove-task:hover {
+  color: #c0392b;
+}
+
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Todo List with Score and Alarm</h2>
+  <div id="todo-list"></div>
+  <div>
+    <input type="text" id="taskInput" placeholder="Add a new task">
+    <input type="time" id="taskCompletionTime" placeholder="Completion Time">
+    <div id="reminderTimesContainer"></div>
+    <button onclick="addReminderTimeInput()">Add Reminder Time</button>
+    <button onclick="addTask()">Add</button>
+    <button onclick="clearTasks()">Clear</button>
+  </div>
+  <div>
+    <p>Score for today: <span id="score">0</span></p>
+  </div>
+  <div id="stopAlarmContainer" style="display: none;">
+    <button onclick="stopAlarm()">Stop Alarm</button>
+  </div>
+</div>
+
+<audio id="alarmAudio" src="audio.mp3" preload="auto"></audio>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  renderTasks();
+  setupReminders();
+});
+
+function renderTasks() {
+  const todoList = JSON.parse(localStorage.getItem("todoList")) || [];
+  const todoListDiv = document.getElementById("todo-list");
+  const scoreSpan = document.getElementById("score");
+  let score = 0;
+
+  todoListDiv.innerHTML = "";
+
+  todoList.forEach((task, index) => {
+    const taskDiv = document.createElement("div");
+    taskDiv.classList.add("todo-item");
+    taskDiv.innerHTML = `
+      <input type="checkbox" id="task${index}" onchange="toggleTask(${index})" ${task.completed ? "checked" : ""}>
+      <label for="task${index}" class="${task.completed ? "completed" : ""}">${task.text}</label>
+      <span>${task.completionTime ? task.completionTime : ""}</span>
+      <span class="remove-task" onclick="removeTask(${index})">&#10006;</span>
+    `;
+    todoListDiv.appendChild(taskDiv);
+    if (task.completed) {
+      score++;
+    }
+  });
+
+  scoreSpan.textContent = score;
+}
+
+function addTask() {
+  const taskInput = document.getElementById("taskInput");
+  const taskCompletionTime = document.getElementById("taskCompletionTime");
+  const reminderTimes = Array.from(document.querySelectorAll(".reminder-time-input")).map(input => input.value).filter(time => time !== "");
+  const taskText = taskInput.value.trim();
+  const completionTime = taskCompletionTime.value !== "" ? taskCompletionTime.value : undefined;
+
+  if (taskText === "") return;
+
+  const todoList = JSON.parse(localStorage.getItem("todoList")) || [];
+  const newTask = { text: taskText, completed: false, completionTime, reminderTimes };
+  todoList.push(newTask);
+  localStorage.setItem("todoList", JSON.stringify(todoList));
+  taskInput.value = "";
+  taskCompletionTime.value = "";
+  document.getElementById("reminderTimesContainer").innerHTML = ""; // Clear reminder time inputs after adding task
+  renderTasks();
+  setupReminders();
+}
+
+function toggleTask(index) {
+  const todoList = JSON.parse(localStorage.getItem("todoList")) || [];
+  todoList[index].completed = !todoList[index].completed;
+  localStorage.setItem("todoList", JSON.stringify(todoList));
+  renderTasks();
+}
+
+function removeTask(index) {
+  const todoList = JSON.parse(localStorage.getItem("todoList")) || [];
+  todoList.splice(index, 1);
+  localStorage.setItem("todoList", JSON.stringify(todoList));
+  renderTasks();
+  setupReminders();
+}
+
+function clearTasks() {
+  localStorage.removeItem("todoList");
+  renderTasks();
+  setupReminders();
+}
+
+function addReminderTimeInput() {
+  const reminderTimesContainer = document.getElementById("reminderTimesContainer");
+  const reminderTimeInput = document.createElement("input");
+  reminderTimeInput.setAttribute("type", "time");
+  reminderTimeInput.classList.add("reminder-time-input");
+  reminderTimeInput.setAttribute("placeholder", "Reminder Time");
+  reminderTimesContainer.appendChild(reminderTimeInput);
+}
+
+function setupReminders() {
+  const todoList = JSON.parse(localStorage.getItem("todoList")) || [];
+  const now = new Date();
+  
+  todoList.forEach(task => {
+    if (!task.completed && task.reminderTimes) {
+      task.reminderTimes.forEach(reminderTime => {
+        const [hours, minutes] = reminderTime.split(":");
+        const reminderDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(hours), parseInt(minutes), 0);
+        const timeDifference = reminderDate - now;
+        if (timeDifference > 0) {
+          setTimeout(() => {
+            document.getElementById("alarmAudio").play();
+            document.getElementById("stopAlarmContainer").style.display = "block"; // Show the stop button when reminder time is reached
+          }, timeDifference);
+        }
+      });
+    }
+  });
+}
+
+function stopAlarm() {
+  const alarmAudio = document.getElementById("alarmAudio");
+  alarmAudio.pause(); // Pause the audio
+  alarmAudio.currentTime = 0; // Reset the audio to the beginning
+  document.getElementById("stopAlarmContainer").style.display = "none"; // Hide the stop button after stopping alarm
+}
+</script>
+
+</body>
+</html>
